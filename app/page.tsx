@@ -2,7 +2,7 @@
 import { useState } from "react";
 
 // Load environment variables
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://backend_ip";
+const BACKEND_URL = "/api";
 
 interface Employee {
   ifhrms_id: string;
