@@ -1,103 +1,559 @@
-import Image from "next/image";
+'use client'
+import { useState, useEffect } from "react";
+
+// Load environment variables
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://backend_ip";
+
+interface Employee {
+  ifhrms_id: string;
+  name: string;
+  designation?: string;
+  phone_number?: string;
+  is_approved: boolean;
+}
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [pendingApprovals, setPendingApprovals] = useState<Employee[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    designation: "",
+    phone_number: "",
+  });
+  const [error, setError] = useState<string | null>(null);
+  
+  // Search and filter states
+  const [approvalSearch, setApprovalSearch] = useState("");
+  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [approvalFilter, setApprovalFilter] = useState("all");
+  const [employeeFilter, setEmployeeFilter] = useState("all");
+  const [currentApprovalPage, setCurrentApprovalPage] = useState(1);
+  const [currentEmployeePage, setCurrentEmployeePage] = useState(1);
+  const itemsPerPage = 10;
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (username === "aiwc-admin" && password === "aiwcrte@2025") {
+      setIsAuthenticated(true);
+      fetchPendingApprovals();
+      fetchAllEmployees();
+    } else {
+      alert("Invalid credentials");
+    }
+  };
+
+  const fetchPendingApprovals = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/users`);
+      if (!response.ok) throw new Error("Failed to fetch pending approvals");
+      const data = await response.json();
+      setPendingApprovals(data.filter((user: Employee) => !user.is_approved));
+    } catch (error) {
+      setError("Error fetching pending approvals. Please try again later.");
+      console.error(error);
+    }
+  };
+
+  const fetchAllEmployees = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/users`);
+      if (!response.ok) throw new Error("Failed to fetch employees");
+      const data = await response.json();
+      setEmployees(data.filter((user: Employee) => user.is_approved));
+    } catch (error) {
+      setError("Error fetching employees. Please try again later.");
+      console.error(error);
+    }
+  };
+
+  const handleApprove = async (ifhrms_id: string) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/approve`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ifhrms_id }),
+      });
+      if (!response.ok) throw new Error("Failed to approve user");
+      fetchPendingApprovals();
+      fetchAllEmployees();
+    } catch (error) {
+      setError("Error approving user. Please try again later.");
+      console.error(error);
+    }
+  };
+
+  const handleReject = async (ifhrms_id: string) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/reject`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ifhrms_id }),
+      });
+      if (!response.ok) throw new Error("Failed to reject user");
+      fetchPendingApprovals();
+    } catch (error) {
+      setError("Error rejecting user. Please try again later.");
+      console.error(error);
+    }
+  };
+
+  const handleApproveAll = async () => {
+    try {
+      for (const user of pendingApprovals) {
+        await handleApprove(user.ifhrms_id);
+      }
+    } catch (error) {
+      setError("Error approving all users. Please try again later.");
+      console.error(error);
+    }
+  };
+
+  const handleRejectAll = async () => {
+    try {
+      for (const user of pendingApprovals) {
+        await handleReject(user.ifhrms_id);
+      }
+    } catch (error) {
+      setError("Error rejecting all users. Please try again later.");
+      console.error(error);
+    }
+  };
+
+  const startEditing = (employee: Employee) => {
+    setEditingEmployee(employee);
+    setEditForm({
+      name: employee.name || "",
+      designation: employee.designation || "",
+      phone_number: employee.phone_number || "",
+    });
+  };
+
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setEditForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingEmployee) return;
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/update`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ifhrms_id: editingEmployee.ifhrms_id,
+          ...editForm
+        }),
+      });
+      if (!response.ok) throw new Error("Failed to update employee");
+      fetchAllEmployees();
+      setEditingEmployee(null);
+    } catch (error) {
+      setError("Error updating employee. Please try again later.");
+      console.error(error);
+    }
+  };
+
+  // Filter and search functions
+  const filteredPendingApprovals = pendingApprovals.filter(user => {
+    const matchesSearch = 
+      user.name.toLowerCase().includes(approvalSearch.toLowerCase()) ||
+      user.ifhrms_id.toLowerCase().includes(approvalSearch.toLowerCase()) ||
+      (user.designation && user.designation.toLowerCase().includes(approvalSearch.toLowerCase()));
+    
+    if (approvalFilter === "all") return matchesSearch;
+    if (approvalFilter === "designation" && user.designation) return matchesSearch;
+    if (approvalFilter === "no-designation" && !user.designation) return matchesSearch;
+    
+    return false;
+  });
+
+  const filteredEmployees = employees.filter(employee => {
+    const matchesSearch = 
+      employee.name.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+      employee.ifhrms_id.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+      (employee.designation && employee.designation.toLowerCase().includes(employeeSearch.toLowerCase())) ||
+      (employee.phone_number && employee.phone_number.includes(employeeSearch));
+    
+    if (employeeFilter === "all") return matchesSearch;
+    if (employeeFilter === "designation" && employee.designation) return matchesSearch;
+    if (employeeFilter === "no-designation" && !employee.designation) return matchesSearch;
+    
+    return false;
+  });
+
+  // Pagination
+  const indexOfLastApproval = currentApprovalPage * itemsPerPage;
+  const indexOfFirstApproval = indexOfLastApproval - itemsPerPage;
+  const currentApprovals = filteredPendingApprovals.slice(indexOfFirstApproval, indexOfLastApproval);
+  
+  const indexOfLastEmployee = currentEmployeePage * itemsPerPage;
+  const indexOfFirstEmployee = indexOfLastEmployee - itemsPerPage;
+  const currentEmployees = filteredEmployees.slice(indexOfFirstEmployee, indexOfLastEmployee);
+  
+  const totalApprovalPages = Math.ceil(filteredPendingApprovals.length / itemsPerPage);
+  const totalEmployeePages = Math.ceil(filteredEmployees.length / itemsPerPage);
+
+  const paginate = (pageNumber: number, section: 'approval' | 'employee') => {
+    if (section === 'approval') {
+      setCurrentApprovalPage(pageNumber);
+    } else {
+      setCurrentEmployeePage(pageNumber);
+    }
+  };
+
+  return (
+    <div className="min-h-screen p-4 md:p-8 bg-gray-50">
+      {error && <div className="bg-red-100 text-red-800 p-4 rounded mb-4">{error}</div>}
+      {!isAuthenticated ? (
+        <div className="max-w-md mx-auto mt-20 p-6 bg-white rounded-lg shadow-md">
+          <h1 className="text-2xl font-bold mb-6 text-center">Admin Login</h1>
+          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+              <input
+                type="text"
+                placeholder="Enter username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <input
+                type="password"
+                placeholder="Enter password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <button 
+              type="submit"
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
+            >
+              Login
+            </button>
+          </form>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      ) : (
+        <div className=" mx-auto">
+          <header className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-800">Admin Dashboard</h1>
+          </header>
+          
+          {editingEmployee ? (
+            <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+              <h2 className="text-xl font-semibold mb-4">Edit Employee: {editingEmployee.name}</h2>
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={editForm.name}
+                    onChange={handleEditChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Designation</label>
+                  <input
+                    type="text"
+                    name="designation"
+                    value={editForm.designation}
+                    onChange={handleEditChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                  <input
+                    type="text"
+                    name="phone_number"
+                    value={editForm.phone_number}
+                    onChange={handleEditChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div className="flex space-x-4">
+                  <button 
+                    type="submit"
+                    className="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700"
+                  >
+                    Save Changes
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setEditingEmployee(null)}
+                    className="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Left side - All Employees */}
+              <section className="bg-white p-6 rounded-lg shadow-md md:w-1/2">
+                <h2 className="text-xl font-semibold mb-4">All Employees ({filteredEmployees.length})</h2>
+                
+                <div className="flex flex-col gap-4 mb-4">
+                  <div className="w-full">
+                    <input
+                      type="text"
+                      placeholder="Search by name, ID, designation, or phone..."
+                      value={employeeSearch}
+                      onChange={(e) => {
+                        setEmployeeSearch(e.target.value);
+                        setCurrentEmployeePage(1);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div className="w-full">
+                    <select
+                      value={employeeFilter}
+                      onChange={(e) => {
+                        setEmployeeFilter(e.target.value);
+                        setCurrentEmployeePage(1);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    >
+                      <option value="all">All Employees</option>
+                      <option value="designation">With Designation</option>
+                      <option value="no-designation">Without Designation</option>
+                    </select>
+                  </div>
+                </div>
+                
+                {filteredEmployees.length === 0 ? (
+                  <p className="text-gray-500">No employees match your criteria</p>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Designation</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {currentEmployees.map((employee) => (
+                            <tr key={employee.ifhrms_id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{employee.name}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{employee.ifhrms_id}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{employee.designation || "-"}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{employee.phone_number || "-"}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button 
+                                  onClick={() => startEditing(employee)}
+                                  className="text-blue-600 hover:text-blue-800 bg-blue-100 hover:bg-blue-200 p-1 rounded"
+                                  title="Edit employee"
+                                >
+                                  ✏️ Edit
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    
+                    {/* Pagination for Employees */}
+                    {totalEmployeePages > 1 && (
+                      <div className="flex justify-center mt-4">
+                        <nav className="flex items-center">
+                          <button
+                            onClick={() => paginate(Math.max(1, currentEmployeePage - 1), 'employee')}
+                            disabled={currentEmployeePage === 1}
+                            className="px-3 py-1 rounded-md mr-2 bg-gray-200 disabled:opacity-50"
+                          >
+                            Previous
+                          </button>
+                          <div className="flex space-x-1">
+                            {Array.from({ length: totalEmployeePages }, (_, i) => i + 1).map(number => (
+                              <button
+                                key={number}
+                                onClick={() => paginate(number, 'employee')}
+                                className={`px-3 py-1 rounded-md ${
+                                  currentEmployeePage === number ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                                }`}
+                              >
+                                {number}
+                              </button>
+                            ))}
+                          </div>
+                          <button
+                            onClick={() => paginate(Math.min(totalEmployeePages, currentEmployeePage + 1), 'employee')}
+                            disabled={currentEmployeePage === totalEmployeePages}
+                            className="px-3 py-1 rounded-md ml-2 bg-gray-200 disabled:opacity-50"
+                          >
+                            Next
+                          </button>
+                        </nav>
+                      </div>
+                    )}
+                  </>
+                )}
+              </section>
+              
+              {/* Right side - Pending Approvals */}
+              <section className="bg-white p-6 rounded-lg shadow-md md:w-1/2">
+                <div className="flex flex-col justify-between mb-6">
+                  <h2 className="text-xl font-semibold mb-2">Pending Approvals ({filteredPendingApprovals.length})</h2>
+                  <div className="flex space-x-2 mt-2">
+                    <button 
+                      onClick={handleApproveAll}
+                      className="bg-green-600 text-white py-1 px-3 rounded-md hover:bg-green-700 text-sm"
+                      disabled={pendingApprovals.length === 0}
+                    >
+                      Approve All
+                    </button>
+                    <button 
+                      onClick={handleRejectAll}
+                      className="bg-red-600 text-white py-1 px-3 rounded-md hover:bg-red-700 text-sm"
+                      disabled={pendingApprovals.length === 0}
+                    >
+                      Reject All
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col gap-4 mb-4">
+                  <div className="w-full">
+                    <input
+                      type="text"
+                      placeholder="Search by name, ID, or designation..."
+                      value={approvalSearch}
+                      onChange={(e) => {
+                        setApprovalSearch(e.target.value);
+                        setCurrentApprovalPage(1);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div className="w-full">
+                    <select
+                      value={approvalFilter}
+                      onChange={(e) => {
+                        setApprovalFilter(e.target.value);
+                        setCurrentApprovalPage(1);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    >
+                      <option value="all">All Requests</option>
+                      <option value="designation">With Designation</option>
+                      <option value="no-designation">Without Designation</option>
+                    </select>
+                  </div>
+                </div>
+                
+                {filteredPendingApprovals.length === 0 ? (
+                  <p className="text-gray-500">No pending approvals match your criteria</p>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Designation</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {currentApprovals.map((user) => (
+                            <tr key={user.ifhrms_id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.name}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.ifhrms_id}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.designation || "-"}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div className="flex space-x-2">
+                                  <button 
+                                    onClick={() => handleApprove(user.ifhrms_id)}
+                                    className="bg-green-100 text-green-800 py-1 px-3 rounded-md hover:bg-green-200"
+                                  >
+                                    Approve
+                                  </button>
+                                  <button 
+                                    onClick={() => handleReject(user.ifhrms_id)}
+                                    className="bg-red-100 text-red-800 py-1 px-3 rounded-md hover:bg-red-200"
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    
+                    {/* Pagination for Approvals */}
+                    {totalApprovalPages > 1 && (
+                      <div className="flex justify-center mt-4">
+                        <nav className="flex items-center">
+                          <button
+                            onClick={() => paginate(Math.max(1, currentApprovalPage - 1), 'approval')}
+                            disabled={currentApprovalPage === 1}
+                            className="px-3 py-1 rounded-md mr-2 bg-gray-200 disabled:opacity-50"
+                          >
+                            Previous
+                          </button>
+                          <div className="flex space-x-1">
+                            {Array.from({ length: totalApprovalPages }, (_, i) => i + 1).map(number => (
+                              <button
+                                key={number}
+                                onClick={() => paginate(number, 'approval')}
+                                className={`px-3 py-1 rounded-md ${
+                                  currentApprovalPage === number ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                                }`}
+                              >
+                                {number}
+                              </button>
+                            ))}
+                          </div>
+                          <button
+                            onClick={() => paginate(Math.min(totalApprovalPages, currentApprovalPage + 1), 'approval')}
+                            disabled={currentApprovalPage === totalApprovalPages}
+                            className="px-3 py-1 rounded-md ml-2 bg-gray-200 disabled:opacity-50"
+                          >
+                            Next
+                          </button>
+                        </nav>
+                      </div>
+                    )}
+                  </>
+                )}
+              </section>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
-}
+} 
