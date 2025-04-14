@@ -216,42 +216,74 @@ export default function Home() {
     }
   };
 
+  // Generate pagination numbers with ellipsis
+  const getPaginationNumbers = (currentPage: number, totalPages: number) => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    
+    if (currentPage <= 4) {
+      return [1, 2, 3, '...', totalPages - 2, totalPages - 1, totalPages];
+    }
+    
+    if (currentPage >= totalPages - 3) {
+      return [1, 2, 3, '...', totalPages - 2, totalPages - 1, totalPages];
+    }
+    
+    return [1, 2, 3, '...', currentPage, '...', totalPages - 2, totalPages - 1, totalPages];
+  };
+
   return (
     <div className="min-h-screen p-4 md:p-8 bg-gray-50">
       {error && <div className="bg-red-100 text-red-800 p-4 rounded mb-4">{error}</div>}
       {!isAuthenticated ? (
-        <div className="max-w-md mx-auto mt-20 p-6 bg-white rounded-lg shadow-md">
-          <h1 className="text-2xl font-bold mb-6 text-center">Admin Login</h1>
-          <form onSubmit={handleLogin} className="flex flex-col gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-              <input
-                type="text"
-                placeholder="Enter username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
+        <div className="flex h-screen">
+          {/* Left side - Green gradient with logo */}
+          <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-green-400 to-green-700 justify-center items-center relative">
+            <div className="absolute inset-0 bg-contain bg-center bg-no-repeat opacity-20" 
+                 style={{backgroundImage: "url('https://www.aiwc.res.in/assets/images/emb.png')"}}></div>
+            <div className="z-10 text-white text-center p-8">
+              <h1 className="text-3xl font-bold mb-4">AIWC Admin Portal</h1>
+              <p className="text-xl">Forest Department Management System</p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input
-                type="password"
-                placeholder="Enter password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
+          </div>
+          
+          {/* Right side - Login form */}
+          <div className="w-full md:w-1/2 flex items-center justify-center p-8">
+            <div className="w-full max-w-md">
+              <h1 className="text-2xl font-bold mb-6 text-gray-800">Admin Login</h1>
+              <form onSubmit={handleLogin} className="flex flex-col gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                  <input
+                    type="text"
+                    placeholder="Enter username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <input
+                    type="password"
+                    placeholder="Enter password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    required
+                  />
+                </div>
+                <button 
+                  type="submit"
+                  className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 mt-4"
+                >
+                  Login
+                </button>
+              </form>
             </div>
-            <button 
-              type="submit"
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
-            >
-              Login
-            </button>
-          </form>
+          </div>
         </div>
       ) : (
         <div className=" mx-auto">
@@ -394,12 +426,14 @@ export default function Home() {
                             Previous
                           </button>
                           <div className="flex space-x-1">
-                            {Array.from({ length: totalEmployeePages }, (_, i) => i + 1).map(number => (
+                            {getPaginationNumbers(currentEmployeePage, totalEmployeePages).map((number, index) => (
                               <button
-                                key={number}
-                                onClick={() => paginate(number, 'employee')}
+                                key={index}
+                                onClick={() => typeof number === 'number' ? paginate(number, 'employee') : null}
+                                disabled={number === '...'}
                                 className={`px-3 py-1 rounded-md ${
-                                  currentEmployeePage === number ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                                  currentEmployeePage === number ? 'bg-blue-500 text-white' : 
+                                  number === '...' ? 'bg-gray-100 cursor-default' : 'bg-gray-200'
                                 }`}
                               >
                                 {number}
@@ -525,12 +559,14 @@ export default function Home() {
                             Previous
                           </button>
                           <div className="flex space-x-1">
-                            {Array.from({ length: totalApprovalPages }, (_, i) => i + 1).map(number => (
+                            {getPaginationNumbers(currentApprovalPage, totalApprovalPages).map((number, index) => (
                               <button
-                                key={number}
-                                onClick={() => paginate(number, 'approval')}
+                                key={index}
+                                onClick={() => typeof number === 'number' ? paginate(number, 'approval') : null}
+                                disabled={number === '...'}
                                 className={`px-3 py-1 rounded-md ${
-                                  currentApprovalPage === number ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                                  currentApprovalPage === number ? 'bg-blue-500 text-white' : 
+                                  number === '...' ? 'bg-gray-100 cursor-default' : 'bg-gray-200'
                                 }`}
                               >
                                 {number}
